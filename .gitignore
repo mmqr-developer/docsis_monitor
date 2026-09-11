@@ -1,0 +1,7 @@
+# Rust build output.
+/target/
+
+# Local configuration. The real file lives at ~/config/docsis_monitor.json or
+# /etc/docsis_monitor.json and may carry a mail relay password;
+# docsis_monitor.example.json is the one that belongs in git.
+/docsis_monitor.json

@@ -1,0 +1,109 @@
+{
+  "//": "Copyright MMQR Development",
+  "//": "docsis_monitor.json — everything docsis_monitor does.",
+  "//": "Install at ~/config/docsis_monitor.json, or /etc/docsis_monitor.json",
+  "//": "for a system service. Nothing here is a command-line flag: a monitor",
+  "//": "is started once and left running for months, and a setting on a",
+  "//": "command line is a setting nobody can find six months later.",
+
+  "//": "--- what to watch --------------------------------------------------",
+  "//": "One interface, by name. Not \"any\": a monitor that cannot say WHICH",
+  "//": "wire went quiet cannot say anything worth acting on. This wants to",
+  "//": "be the interface the CMTS relays reach the provisioning server on,",
+  "//": "or a mirror of it.",
+  "interface": "eth0",
+
+  "//": "Stay in the foreground. --nofork says the same for one run. It",
+  "//": "detaches by default: a monitor that stops when somebody closes a",
+  "//": "terminal is worse than no monitor, because the screen it was meant",
+  "//": "to warn on stays quiet either way.",
+  "nofork": false,
+
+  "//": "--- how it decides -------------------------------------------------",
+  "//": "How many seconds of history a judgement is made over, and how often",
+  "//": "the counts are written to ~/logs/docsis_monitor.log. Five minutes is",
+  "//": "long enough that one slow minute is not an alarm and short enough",
+  "//": "that a real outage is caught before the phone rings.",
+  "window": 300,
+  "report_every": 300,
+
+  "thresholds": {
+    "//": "Least fraction of those requests that must be answered, 0 to 1.",
+    "//": "A server that is up, listening and failing everything looks",
+    "//": "exactly like one that is down. Not evaluated until a handful have",
+    "//": "arrived: a ratio over three packets is noise.",
+    "min_answered": 0.75,
+
+    "//": "The longest silence that is normal on a CMTS interface nobody has",
+    "//": "measured, in seconds. Deliberately generous: an interface nobody",
+    "//": "has looked at should not be the one that wakes somebody up.",
+    "idle_seconds": 3600,
+
+    "//": "How long the same trap is not repeated for, in seconds. An outage",
+    "//": "lasting an afternoon is one problem, not fifty. A CHANGE always",
+    "//": "goes out -- quiet to unanswered, or recovery -- however recently",
+    "//": "something was said.",
+    "resend_after": 900
+  },
+
+  "//": "--- what each CMTS expects -----------------------------------------",
+  "//": "A plant is not one thing. One interface carries several thousand",
+  "//": "modems and should never be silent for five minutes; another carries",
+  "//": "forty and is properly silent for an hour. One number over the whole",
+  "//": "plant is wrong for both: set for the busy one it cries wolf about",
+  "//": "the quiet one every night, and set for the quiet one it says nothing",
+  "//": "for an hour after the busy one falls over.",
+  "//": "",
+  "//": "Keyed on the gi-address, which is what the relay stamps on a request",
+  "//": "and what the server picks a pool from. Anything not named here uses",
+  "//": "idle_seconds above.",
+  "//": "",
+  "//": "Do not guess these. Run `docsis_monitor --adaptation 60`, which",
+  "//": "watches for an hour and then writes a suggested block into the log,",
+  "//": "measured from what the plant actually did.",
+  "per_relay": {
+    "10.100.0.1":  { "idle_seconds": 300 },
+    "10.100.0.17": { "idle_seconds": 3600 }
+  },
+
+  "//": "--- who to tell ----------------------------------------------------",
+  "//": "SNMPv2c traps. No targets means the log only, which is a legitimate",
+  "//": "way to run this: the counts are still written and still worth",
+  "//": "reading. The community is a password sent in clear text, which is",
+  "//": "what SNMPv2c is; it is here because receivers demand one.",
+  "//": "",
+  "//": "Traps arrive under 1.3.6.1.4.1.99999: .1 quiet, .2 unanswered,",
+  "//": ".3 recovered. Each carries the host, the interface, the state, the",
+  "//": "requests, replies and TFTP reads counted, the window length, and the",
+  "//": "busiest destination -- so an alert says where to look without",
+  "//": "anybody logging in.",
+  "snmp": {
+    "targets": [
+      { "host": "10.0.0.9", "port": 162, "community": "public" }
+    ],
+    "//": "What the traps call this host. Defaults to its own name.",
+    "sysname": "docsis-prov-1"
+  },
+
+  "//": "--- and by mail ----------------------------------------------------",
+  "//": "A trap goes to a network management platform, which not every plant",
+  "//": "has. A mail relay, every plant has. The same finding, in a form",
+  "//": "somebody reads on a phone at two in the morning: the subject carries",
+  "//": "the host, the state and the counts, so nobody has to open it to find",
+  "//": "out whether to get up.",
+  "//": "",
+  "//": "Remove this section, or leave `to` empty, and no mail is sent.",
+  "//": "",
+  "//": "PLAIN SMTP, no STARTTLS. This is for a relay on a network you trust,",
+  "//": "which is the ordinary shape for alerting. `username` and `password`",
+  "//": "are here because some relays insist on AUTH, and the password then",
+  "//": "crosses the wire IN CLEAR TEXT. If the relay is not on a network you",
+  "//": "trust, leave them out.",
+  "smtp": {
+    "server": "mail.example.com",
+    "port": 25,
+    "from": "docsis-monitor@example.com",
+    "to": [ "noc@example.com" ],
+    "subject_prefix": "[docsis]"
+  }
+}
